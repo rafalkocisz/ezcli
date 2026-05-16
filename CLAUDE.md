@@ -136,6 +136,7 @@ rationale. ezcli-specific instantiation:
 | Public function | `ez::cli_parse` |
 | Public classes | `ez::CLIConfig`, `ez::CLIFlags`, `ez::CLIOptions`, `ez::CLIArgs` |
 | Return-code macros | `EZ_CLI_OK`, `EZ_CLI_NO_MATCH`, `EZ_CLI_ERR_*` |
+| Private member variables | `snake_case_` (trailing underscore) |
 | White-box testing flag | `EZ_CLI_TESTING` |
 | CMake options | `EZCLI_BUILD_TESTS`, `EZCLI_BUILD_BENCHMARKS`, `EZCLI_SANITIZE`, `EZCLI_BUILD_FUZZ` |
 
