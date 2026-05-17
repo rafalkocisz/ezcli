@@ -210,6 +210,74 @@ int cli_parse(int argc, const char* const* argv,
     }
     if (message) message->clear();
 
+    // --- Program name (used for meta-option output) ---
+    std::string prog;
+    if (!config.program_name_.empty()) {
+        prog = config.program_name_;
+    } else {
+        const char* p = argv[0];
+        const char* start = argv[0];
+        for (; *p; ++p)
+            if (*p == '/' || *p == '\\') start = p + 1;
+        prog = start;
+    }
+
+    auto make_usage_line = [&]() -> std::string {
+        if (!config.usage_.empty()) return config.usage_;
+        std::string s = "Usage: " + prog;
+        if (!config.flags_.empty() || !config.options_.empty()) s += " [options]";
+        for (const auto& p : config.positionals_)
+            s += p.is_list ? " [<" + p.name + ">...]" : " <" + p.name + ">";
+        return s;
+    };
+
+    auto make_version = [&]() -> std::string {
+        return config.version_.empty() ? prog : prog + " " + config.version_;
+    };
+
+    auto make_help = [&]() -> std::string {
+        std::string out = make_usage_line();
+
+        if (!config.flags_.empty() || !config.options_.empty()) {
+            std::vector<std::string> names, descs;
+            for (const auto& d : config.flags_) {
+                std::string col;
+                if (d.short_name != '\0') { col += '-'; col += d.short_name; }
+                if (!d.long_name.empty()) { if (!col.empty()) col += ", "; col += "--"; col += d.long_name; }
+                names.push_back(std::move(col));
+                descs.push_back(d.description);
+            }
+            for (const auto& d : config.options_) {
+                std::string col;
+                if (d.short_name != '\0') { col += '-'; col += d.short_name; }
+                if (!d.long_name.empty()) { if (!col.empty()) col += ", "; col += "--"; col += d.long_name; }
+                col += " <val>";
+                names.push_back(std::move(col));
+                descs.push_back(d.description);
+            }
+            size_t w = 0;
+            for (const auto& n : names) if (n.size() > w) w = n.size();
+            out += "\n\nOptions:";
+            for (size_t k = 0; k < names.size(); ++k)
+                out += "\n  " + names[k] + std::string(w - names[k].size() + 2, ' ') + descs[k];
+        }
+
+        if (!config.positionals_.empty()) {
+            std::vector<std::string> names, descs;
+            for (const auto& p : config.positionals_) {
+                names.push_back(p.is_list ? "[<" + p.name + ">...]" : "<" + p.name + ">");
+                descs.push_back(p.description);
+            }
+            size_t w = 0;
+            for (const auto& n : names) if (n.size() > w) w = n.size();
+            out += "\n\nArguments:";
+            for (size_t k = 0; k < names.size(); ++k)
+                out += "\n  " + names[k] + std::string(w - names[k].size() + 2, ' ') + descs[k];
+        }
+
+        return out;
+    };
+
     // Lambda to assign one positional token to the next available slot.
     // Captures pos_idx by reference so it advances as slots are filled.
     size_t pos_idx = 0;
@@ -277,6 +345,20 @@ int cli_parse(int argc, const char* const* argv,
             }
         }
         else if (token[0] == '-' && token[1] == '-' && token[2] != '\0') {
+            // Meta-options take priority over all other long options
+            if (std::strcmp(token, "--help") == 0) {
+                if (message) *message = make_help();
+                return EZ_CLI_HELP_REQUESTED;
+            }
+            if (std::strcmp(token, "--usage") == 0) {
+                if (message) *message = make_usage_line();
+                return EZ_CLI_USAGE_REQUESTED;
+            }
+            if (std::strcmp(token, "--version") == 0) {
+                if (message) *message = make_version();
+                return EZ_CLI_VERSION_REQUESTED;
+            }
+
             // Long flag or long value option: --name  or  --name=value
             const char* name_start = token + 2;
             const char* eq = std::strchr(name_start, '=');
@@ -353,8 +435,6 @@ int cli_parse(int argc, const char* const* argv,
             int r = add_positional_token(token);
             if (r != EZ_CLI_OK) return r;
         }
-        // Phase 4.7: meta-options
-
         ++i;
     }
 

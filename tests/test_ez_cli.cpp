@@ -1103,3 +1103,224 @@ TEST_SUITE("cli_parse — 4.6 positionals and -- separator")
         CHECK(args.get_list("input").empty());
     }
 }
+
+// ---------------------------------------------------------------------------
+// cli_parse — 4.7: meta-options (--help, --usage, --version)
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("cli_parse — 4.7 meta-options")
+{
+    TEST_CASE("--help returns HELP_REQUESTED")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog", "--help"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_HELP_REQUESTED);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("--usage returns USAGE_REQUESTED")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog", "--usage"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_USAGE_REQUESTED);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("--version returns VERSION_REQUESTED")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog", "--version"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_VERSION_REQUESTED);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("--version with set_version — message contains version string")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("myapp");
+        config.set_version("2.0.1");
+        const char* argv[] = {"prog", "--version"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_VERSION_REQUESTED);
+        CHECK(msg.find("myapp")  != std::string::npos);
+        CHECK(msg.find("2.0.1") != std::string::npos);
+    }
+
+    TEST_CASE("--version without set_version — message contains program name only")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("myapp");
+        const char* argv[] = {"prog", "--version"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_VERSION_REQUESTED);
+        CHECK(msg == "myapp");
+    }
+
+    TEST_CASE("set_program_name overrides argv[0] in usage output")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("mytool");
+        const char* argv[] = {"path/to/other", "--usage"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_USAGE_REQUESTED);
+        CHECK(msg.find("mytool") != std::string::npos);
+        CHECK(msg.find("other")  == std::string::npos);
+    }
+
+    TEST_CASE("argv[0] basename extracted when no set_program_name")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"path/to/prog", "--usage"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_USAGE_REQUESTED);
+        CHECK(msg.find("prog") != std::string::npos);
+        CHECK(msg.find("path") == std::string::npos);
+    }
+
+    TEST_CASE("--usage output starts with 'Usage:'")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("prog");
+        const char* argv[] = {"prog", "--usage"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_USAGE_REQUESTED);
+        CHECK(msg.substr(0, 6) == "Usage:");
+    }
+
+    TEST_CASE("--usage contains [options] when flags/options present")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("prog");
+        int r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--usage"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_USAGE_REQUESTED);
+        CHECK(msg.find("[options]") != std::string::npos);
+    }
+
+    TEST_CASE("--usage contains positional names")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("prog");
+        int r = config.add_positional("input", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--usage"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_USAGE_REQUESTED);
+        CHECK(msg.find("input") != std::string::npos);
+    }
+
+    TEST_CASE("--usage contains list positional with '...'")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("prog");
+        int r = config.add_positional_list("files", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--usage"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_USAGE_REQUESTED);
+        CHECK(msg.find("files")  != std::string::npos);
+        CHECK(msg.find("...")    != std::string::npos);
+    }
+
+    TEST_CASE("set_usage overrides auto-generated usage line")
+    {
+        ez::CLIConfig config;
+        config.set_usage("Usage: prog <special>");
+        const char* argv[] = {"prog", "--usage"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_USAGE_REQUESTED);
+        CHECK(msg == "Usage: prog <special>");
+    }
+
+    TEST_CASE("--help contains Options section with descriptions")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("prog");
+        int r;
+        r = config.add_flag("verbose", 'v', "Enable verbose output"); assert(r == EZ_CLI_OK);
+        r = config.add_flag("dry-run", '\0', "Simulate without writing"); assert(r == EZ_CLI_OK);
+        r = config.add_option("output", 'o', "Output file path"); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--help"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_HELP_REQUESTED);
+        CHECK(msg.find("Options:")               != std::string::npos);
+        CHECK(msg.find("Enable verbose output")  != std::string::npos);
+        CHECK(msg.find("Simulate without writing") != std::string::npos);
+        CHECK(msg.find("Output file path")       != std::string::npos);
+        CHECK(msg.find("--verbose")              != std::string::npos);
+        CHECK(msg.find("--dry-run")              != std::string::npos);
+        CHECK(msg.find("--output")               != std::string::npos);
+        CHECK(msg.find("<val>")                  != std::string::npos);
+    }
+
+    TEST_CASE("--help contains Arguments section with descriptions")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("prog");
+        int r = config.add_positional("input", "Input file to process"); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--help"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_HELP_REQUESTED);
+        CHECK(msg.find("Arguments:")            != std::string::npos);
+        CHECK(msg.find("input")                 != std::string::npos);
+        CHECK(msg.find("Input file to process") != std::string::npos);
+    }
+
+    TEST_CASE("--help with no flags/options/positionals — no Options or Arguments sections")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("prog");
+        const char* argv[] = {"prog", "--help"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_HELP_REQUESTED);
+        CHECK(msg.find("Options:")   == std::string::npos);
+        CHECK(msg.find("Arguments:") == std::string::npos);
+    }
+
+    TEST_CASE("--help contains usage line")
+    {
+        ez::CLIConfig config;
+        config.set_program_name("prog");
+        const char* argv[] = {"prog", "--help"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_HELP_REQUESTED);
+        CHECK(msg.find("Usage:") != std::string::npos);
+        CHECK(msg.find("prog")   != std::string::npos);
+    }
+
+    TEST_CASE("--help uses set_usage override")
+    {
+        ez::CLIConfig config;
+        config.set_usage("Usage: prog [custom]");
+        const char* argv[] = {"prog", "--help"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_HELP_REQUESTED);
+        CHECK(msg.find("Usage: prog [custom]") != std::string::npos);
+    }
+
+    TEST_CASE("--help after '--' treated as positional — not a meta-option")
+    {
+        ez::CLIConfig config;
+        int r = config.add_positional("input", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--", "--help"};
+        ez::CLIArgs args;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, nullptr, &args) == EZ_CLI_OK);
+        CHECK(args.get("input") == "--help");
+    }
+
+    TEST_CASE("null message pointer — no crash on --help")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog", "--help"};
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, nullptr) == EZ_CLI_HELP_REQUESTED);
+    }
+
+    TEST_CASE("null message pointer — no crash on --version")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog", "--version"};
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, nullptr) == EZ_CLI_VERSION_REQUESTED);
+    }
+}
