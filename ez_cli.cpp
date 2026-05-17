@@ -254,8 +254,24 @@ int cli_parse(int argc, const char* const* argv,
                 return EZ_CLI_NO_MATCH;
             }
         }
-        // Phase 4.4/4.5: long options (--)
-        // Phase 4.6: positionals
+        else if (token[0] == '-' && token[1] == '-' && token[2] != '\0') {
+            // Long flag: --name
+            const char* name = token + 2;
+            bool found = false;
+            for (const auto& d : config.flags_) {
+                if (!d.long_name.empty() && d.long_name == name) {
+                    found = true;
+                    if (flags) flags->flags_.push_back({d.long_name, d.short_name});
+                    break;
+                }
+            }
+            if (!found) {
+                // Phase 4.5 will extend this branch for long value options
+                if (message) { *message = "unknown option: --"; *message += name; }
+                return EZ_CLI_NO_MATCH;
+            }
+        }
+        // Phase 4.6: positionals + '--' separator
         // Phase 4.7: meta-options
 
         ++i;
