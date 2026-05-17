@@ -35,11 +35,12 @@ int main(int argc, const char* const* argv)
 {
     // Define the CLI interface
     ez::CLIConfig config;
+    config.set_version("1.0.0");
     int r;
-    r = config.add_flag("verbose", 'v', "Enable verbose output");  assert(r == EZ_CLI_OK);
+    r = config.add_flag("verbose", 'v', "Enable verbose output");     assert(r == EZ_CLI_OK);
     r = config.add_flag("dry-run", '\0', "Simulate without writing"); assert(r == EZ_CLI_OK);
-    r = config.add_option("output", 'o', "Output file path");      assert(r == EZ_CLI_OK);
-    r = config.add_positional("input", "Input file to process");   assert(r == EZ_CLI_OK);
+    r = config.add_option("output", 'o', "Output file path");         assert(r == EZ_CLI_OK);
+    r = config.add_positional("input", "Input file to process");      assert(r == EZ_CLI_OK);
 
     // Parse
     ez::CLIFlags   flags;
