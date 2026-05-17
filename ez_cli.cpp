@@ -210,6 +210,28 @@ int cli_parse(int argc, const char* const* argv,
     }
     if (message) message->clear();
 
+    // Lambda to assign one positional token to the next available slot.
+    // Captures pos_idx by reference so it advances as slots are filled.
+    size_t pos_idx = 0;
+    auto add_positional_token = [&](const char* val) -> int {
+        if (pos_idx < config.positionals_.size()) {
+            const auto& p = config.positionals_[pos_idx];
+            if (!p.is_list) {
+                if (args) args->args_.push_back({p.name, std::string_view(val)});
+                ++pos_idx;
+            } else {
+                if (args) {
+                    if (args->list_name_.empty()) args->list_name_ = p.name;
+                    args->list_values_.push_back(std::string_view(val));
+                }
+                // stay on the list slot — it absorbs all remaining tokens
+            }
+            return EZ_CLI_OK;
+        }
+        if (message) { *message = "unexpected argument: "; *message += val; }
+        return EZ_CLI_NO_MATCH;
+    };
+
     int i = 1;  // skip argv[0] (program name)
 
     while (i < argc) {
@@ -316,7 +338,21 @@ int cli_parse(int argc, const char* const* argv,
                 }
             }
         }
-        // Phase 4.6: positionals + '--' separator
+        else if (token[0] == '-' && token[1] == '-' && token[2] == '\0') {
+            // '--' end-of-options: all remaining tokens are positionals
+            ++i;
+            while (i < argc) {
+                int r = add_positional_token(argv[i]);
+                if (r != EZ_CLI_OK) return r;
+                ++i;
+            }
+            break;
+        }
+        else {
+            // Positional token (no leading '-', or lone '-')
+            int r = add_positional_token(token);
+            if (r != EZ_CLI_OK) return r;
+        }
         // Phase 4.7: meta-options
 
         ++i;

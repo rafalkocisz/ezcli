@@ -923,3 +923,183 @@ TEST_SUITE("cli_parse — 4.5 long value options")
         CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr) == EZ_CLI_OK);
     }
 }
+
+// ---------------------------------------------------------------------------
+// cli_parse — 4.6: positional arguments and '--' separator
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("cli_parse — 4.6 positionals and -- separator")
+{
+    TEST_CASE("single named positional")
+    {
+        ez::CLIConfig config;
+        int r = config.add_positional("input", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "file.txt"};
+        ez::CLIArgs args;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, &args) == EZ_CLI_OK);
+        CHECK(args.get("input") == "file.txt");
+    }
+
+    TEST_CASE("multiple named positionals")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_positional("src",  nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_positional("dest", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "a.txt", "b.txt"};
+        ez::CLIArgs args;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, nullptr, &args) == EZ_CLI_OK);
+        CHECK(args.get("src")  == "a.txt");
+        CHECK(args.get("dest") == "b.txt");
+    }
+
+    TEST_CASE("positional list — multiple values")
+    {
+        ez::CLIConfig config;
+        int r = config.add_positional_list("files", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "a.txt", "b.txt", "c.txt"};
+        ez::CLIArgs args;
+        CHECK(ez::cli_parse(4, argv, config, nullptr, nullptr, &args) == EZ_CLI_OK);
+        auto list = args.get_list("files");
+        CHECK(list.size() == 3);
+        CHECK(list[0] == "a.txt");
+        CHECK(list[1] == "b.txt");
+        CHECK(list[2] == "c.txt");
+    }
+
+    TEST_CASE("named positional then list")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_positional("first", nullptr);      assert(r == EZ_CLI_OK);
+        r = config.add_positional_list("rest", nullptr);  assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "one", "two", "three"};
+        ez::CLIArgs args;
+        CHECK(ez::cli_parse(4, argv, config, nullptr, nullptr, &args) == EZ_CLI_OK);
+        CHECK(args.get("first") == "one");
+        auto list = args.get_list("rest");
+        CHECK(list.size() == 2);
+        CHECK(list[0] == "two");
+        CHECK(list[1] == "three");
+    }
+
+    TEST_CASE("flags and positionals mixed")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr);   assert(r == EZ_CLI_OK);
+        r = config.add_positional("input", nullptr);    assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-v", "file.txt"};
+        ez::CLIFlags flags;
+        ez::CLIArgs  args;
+        CHECK(ez::cli_parse(3, argv, config, &flags, nullptr, &args) == EZ_CLI_OK);
+        CHECK(flags.is_set("v"));
+        CHECK(args.get("input") == "file.txt");
+    }
+
+    TEST_CASE("options and positionals mixed")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_option("output", 'o', nullptr);  assert(r == EZ_CLI_OK);
+        r = config.add_positional("input", nullptr);    assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--output=out.txt", "in.txt"};
+        ez::CLIOptions options;
+        ez::CLIArgs    args;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, &options, &args) == EZ_CLI_OK);
+        CHECK(options.get("output") == "out.txt");
+        CHECK(args.get("input")     == "in.txt");
+    }
+
+    TEST_CASE("'--' separator: token after -- not parsed as flag")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr);   assert(r == EZ_CLI_OK);
+        r = config.add_positional("input", nullptr);    assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--", "-v"};
+        ez::CLIFlags flags;
+        ez::CLIArgs  args;
+        CHECK(ez::cli_parse(3, argv, config, &flags, nullptr, &args) == EZ_CLI_OK);
+        CHECK(!flags.is_set("v"));            // -v was not parsed as a flag
+        CHECK(args.get("input") == "-v");     // it became the positional value
+    }
+
+    TEST_CASE("'--' separator: flags before, positionals after")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr);   assert(r == EZ_CLI_OK);
+        r = config.add_positional("input", nullptr);    assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-v", "--", "file.txt"};
+        ez::CLIFlags flags;
+        ez::CLIArgs  args;
+        CHECK(ez::cli_parse(4, argv, config, &flags, nullptr, &args) == EZ_CLI_OK);
+        CHECK(flags.is_set("v"));
+        CHECK(args.get("input") == "file.txt");
+    }
+
+    TEST_CASE("lone '-' treated as positional")
+    {
+        ez::CLIConfig config;
+        int r = config.add_positional("input", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-"};
+        ez::CLIArgs args;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, &args) == EZ_CLI_OK);
+        CHECK(args.get("input") == "-");
+    }
+
+    TEST_CASE("extra positional — no list, no slots — NO_MATCH")
+    {
+        ez::CLIConfig config;
+        int r = config.add_positional("input", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "a.txt", "b.txt"};
+        std::string msg;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_NO_MATCH);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("positional with no config — NO_MATCH")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog", "file.txt"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_NO_MATCH);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("args cleared between calls")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_positional("src",  nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_positional("dest", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv1[] = {"prog", "a.txt", "b.txt"};
+        ez::CLIArgs args;
+        CHECK(ez::cli_parse(3, argv1, config, nullptr, nullptr, &args) == EZ_CLI_OK);
+        CHECK(args.get("src") == "a.txt");
+        const char* argv2[] = {"prog", "x.txt", "y.txt"};
+        CHECK(ez::cli_parse(3, argv2, config, nullptr, nullptr, &args) == EZ_CLI_OK);
+        CHECK(args.get("src")  == "x.txt");
+        CHECK(args.get("dest") == "y.txt");
+    }
+
+    TEST_CASE("null args pointer — no crash")
+    {
+        ez::CLIConfig config;
+        int r = config.add_positional("input", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "file.txt"};
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr) == EZ_CLI_OK);
+    }
+
+    TEST_CASE("get on undeclared name returns empty")
+    {
+        ez::CLIConfig config;
+        int r = config.add_positional("input", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "file.txt"};
+        ez::CLIArgs args;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, &args) == EZ_CLI_OK);
+        CHECK(args.get("other").empty());
+        CHECK(args.get_list("input").empty());
+    }
+}
