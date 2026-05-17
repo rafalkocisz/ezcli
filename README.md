@@ -268,6 +268,70 @@ For verbose output:
 .\build\tests\Debug\test_ez_cli.exe
 ```
 
+## Benchmarks
+
+Benchmarks compare `cli_parse()` against hand-coded argument parsing — a minimal
+`for` loop using direct `strcmp`/pointer comparisons with no config objects. This
+establishes the overhead ratio of the abstraction layer.
+
+Uses [nanobench](https://github.com/martinus/nanobench) v4.3.11, downloaded automatically
+by CMake at configure time (requires internet access and git).
+
+### Build
+
+```sh
+# Linux / macOS
+cmake -B build -DEZCLI_BUILD_BENCHMARKS=ON
+cmake --build build --config Release
+
+# Windows
+cmake -B build -G "Visual Studio 17 2022" -DEZCLI_BUILD_BENCHMARKS=ON
+cmake --build build --config Release
+```
+
+### Run
+
+```sh
+# Linux / macOS
+./build/benchmarks/bench_ez_cli
+
+# Windows
+.\build\benchmarks\Release\bench_ez_cli.exe
+```
+
+### Benchmark scenarios
+
+| # | Scenario | argv | Notes |
+|---|----------|------|-------|
+| 1 | Short flags, separate | `-v -q -d` | 3 tokens, 3 defined flags |
+| 2 | Short flags, clustered | `-vqd` | 1 token, 3 defined flags |
+| 3 | Mixed | `-v --output=out.txt in.txt` | flag + long option (`=` form) + positional |
+| 4 | Meta-option | `--help` | Generates full formatted help string; no hand-coded baseline |
+
+### Indicative results (MSVC, Release, Windows 10)
+
+| Scenario | ezcli | hand-coded | ratio |
+|---|---|---|---|
+| Short flags `-v -q -d` | ~95 ns | ~11 ns | ~9× |
+| Clustered `-vqd` | ~54 ns | ~7 ns | ~8× |
+| Mixed | ~124 ns | ~11 ns | ~11× |
+| `--help` (help string) | ~3 000 ns | — | — |
+
+**Key observations:**
+
+- Normal parses cost **~55–125 ns** — well under 1 µs regardless of input shape.
+- The abstraction overhead is **8–11×** compared to bare pointer/`strcmp` code,
+  coming from `std::vector` config lookups and per-call result-object clearing.
+- `--help` costs **~3 µs** due to the formatted help string being rebuilt on every
+  call — entirely acceptable for a once-per-invocation code path.
+- All of this is startup-time cost. `cli_parse` is called once per program run;
+  even the slowest scenario adds under a microsecond to program startup.
+
+> **Note:** some ezcli benchmark rows show nanobench "Unstable" markers because
+> `cli_parse` performs a `std::string` heap allocation on every call (program-name
+> extraction needed for potential meta-option output). The absolute values and ratios
+> are consistent across runs despite the instability flag.
+
 ## Repository layout
 
 ```
