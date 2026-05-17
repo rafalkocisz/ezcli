@@ -51,7 +51,7 @@ int main()
     namespace nb = ankerl::nanobench;
     nb::Bench bench;
     bench.title("ezcli vs hand-coded").unit("parse")
-         .warmup(200).minEpochIterations(10000);
+         .warmup(1000).minEpochIterations(200000);
 
     // -----------------------------------------------------------------------
     // Scenario 1: three short flags — separate tokens (-v -q -d)
