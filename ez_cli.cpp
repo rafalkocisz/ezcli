@@ -231,7 +231,24 @@ int cli_parse(int argc, const char* const* argv,
                 }
                 if (found) continue;
 
-                // Phase 4.3: option handling inserted here
+                // Look up as a value option
+                bool found_option = false;
+                for (const auto& d : config.options_) {
+                    if (d.short_name != c) continue;
+                    found_option = true;
+                    std::string_view value;
+                    if (*(p + 1) != '\0') {
+                        value = p + 1;          // packed: -ofile
+                    } else if (i + 1 < argc) {
+                        value = argv[++i];      // space-separated: -o file
+                    } else {
+                        if (message) { *message = "option requires a value: -"; *message += c; }
+                        return EZ_CLI_ERR_MISSING_VAL;
+                    }
+                    if (options) options->options_.push_back({d.long_name, d.short_name, value});
+                    break;
+                }
+                if (found_option) break;  // option consumed rest of cluster; exit cluster loop
 
                 if (message) { *message = "unknown option: -"; *message += c; }
                 return EZ_CLI_NO_MATCH;

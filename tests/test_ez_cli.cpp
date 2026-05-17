@@ -548,3 +548,149 @@ TEST_SUITE("CLIConfig::add_positional_list")
         CHECK(c.add_positional_list("extras", nullptr) == EZ_CLI_ERR_CONFIG_NAME);
     }
 }
+
+// ---------------------------------------------------------------------------
+// cli_parse — 4.3: short value options
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("cli_parse — 4.3 short value options")
+{
+    TEST_CASE("space-separated: -o file")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-o", "file.txt"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.is_set("o"));
+        CHECK(options.is_set("output"));
+        CHECK(options.get("o")      == "file.txt");
+        CHECK(options.get("output") == "file.txt");
+    }
+
+    TEST_CASE("packed: -ofile")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-ofile.txt"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.is_set("o"));
+        CHECK(options.get("o") == "file.txt");
+    }
+
+    TEST_CASE("flags before option, space: -vqo file")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_flag("quiet",   'q', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-vqo", "out.txt"};
+        ez::CLIFlags   flags;
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(3, argv, config, &flags, &options) == EZ_CLI_OK);
+        CHECK(flags.is_set("v"));
+        CHECK(flags.is_set("q"));
+        CHECK(options.is_set("o"));
+        CHECK(options.get("o") == "out.txt");
+    }
+
+    TEST_CASE("flags before option, packed: -vqoout.txt")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_flag("quiet",   'q', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-vqoout.txt"};
+        ez::CLIFlags   flags;
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(2, argv, config, &flags, &options) == EZ_CLI_OK);
+        CHECK(flags.is_set("v"));
+        CHECK(flags.is_set("q"));
+        CHECK(options.is_set("o"));
+        CHECK(options.get("o") == "out.txt");
+    }
+
+    TEST_CASE("option not provided — is_set false, get empty")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(1, argv, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(!options.is_set("o"));
+        CHECK(!options.is_set("output"));
+        CHECK(options.get("o").empty());
+        CHECK(options.get("output").empty());
+    }
+
+    TEST_CASE("missing value at end of argv — MISSING_VAL with message")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-o"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_ERR_MISSING_VAL);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("missing value in cluster at end of argv — MISSING_VAL")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-vo"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_ERR_MISSING_VAL);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("options cleared between calls")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_option("input",  'i', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv1[] = {"prog", "-o", "out.txt"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(3, argv1, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.is_set("o"));
+        const char* argv2[] = {"prog", "-i", "in.txt"};
+        CHECK(ez::cli_parse(3, argv2, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(!options.is_set("o"));
+        CHECK(options.is_set("i"));
+        CHECK(options.get("i") == "in.txt");
+    }
+
+    TEST_CASE("null options pointer — no crash")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-o", "file.txt"};
+        CHECK(ez::cli_parse(3, argv, config, nullptr, nullptr) == EZ_CLI_OK);
+    }
+
+    TEST_CASE("short-name-only option")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option(nullptr, 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-o", "file.txt"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.is_set("o"));
+        CHECK(options.get("o") == "file.txt");
+    }
+
+    TEST_CASE("value starting with hyphen — consumed as value")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-o", "-myfile"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.get("o") == "-myfile");
+    }
+}
