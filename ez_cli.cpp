@@ -109,6 +109,16 @@ int CLIConfig::add_positional_list(const char* name, const char* description)
     return EZ_CLI_OK;
 }
 
+void CLIConfig::set_version(const char* version)
+{
+    version_ = version ? version : "";
+}
+
+void CLIConfig::set_program_name(const char* name)
+{
+    program_name_ = name ? name : "";
+}
+
 // ---------------------------------------------------------------------------
 // CLIFlags
 

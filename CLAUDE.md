@@ -29,6 +29,11 @@ public:
     // add_positional_list() must be called last and only once — asserted
     int add_positional(const char* name, const char* description);
     int add_positional_list(const char* name, const char* description);
+
+    // Optional metadata for help/usage/version output.
+    // If set_program_name() is not called, argv[0] basename is used.
+    void set_version(const char* version);
+    void set_program_name(const char* name);
 };
 
 class CLIFlags {

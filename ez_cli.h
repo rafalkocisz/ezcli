@@ -58,6 +58,11 @@ public:
     int add_positional(const char* name, const char* description);
     int add_positional_list(const char* name, const char* description);
 
+    // Optional metadata for help/usage/version output.
+    // If set_program_name() is not called, argv[0] basename is used.
+    void set_version(const char* version);
+    void set_program_name(const char* name);
+
 private:
     friend int cli_parse(int, const char* const*, const CLIConfig&,
                          CLIFlags*, CLIOptions*, CLIArgs*, std::string*);
@@ -77,6 +82,8 @@ private:
     std::vector<Def>           flags_;
     std::vector<Def>           options_;
     std::vector<PositionalDef> positionals_;
+    std::string                version_;       // empty if not set
+    std::string                program_name_;  // empty if not set; falls back to argv[0] basename
 };
 
 // ---------------------------------------------------------------------------
