@@ -119,6 +119,11 @@ void CLIConfig::set_program_name(const char* name)
     program_name_ = name ? name : "";
 }
 
+void CLIConfig::set_usage(const char* usage)
+{
+    usage_ = usage ? usage : "";
+}
+
 // ---------------------------------------------------------------------------
 // CLIFlags
 

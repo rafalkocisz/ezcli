@@ -60,8 +60,10 @@ public:
 
     // Optional metadata for help/usage/version output.
     // If set_program_name() is not called, argv[0] basename is used.
+    // If set_usage() is not called, the usage line is auto-generated from the config.
     void set_version(const char* version);
     void set_program_name(const char* name);
+    void set_usage(const char* usage);
 
 private:
     friend int cli_parse(int, const char* const*, const CLIConfig&,
@@ -84,6 +86,7 @@ private:
     std::vector<PositionalDef> positionals_;
     std::string                version_;       // empty if not set
     std::string                program_name_;  // empty if not set; falls back to argv[0] basename
+    std::string                usage_;         // empty if not set; auto-generated if empty
 };
 
 // ---------------------------------------------------------------------------

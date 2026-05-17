@@ -32,8 +32,10 @@ public:
 
     // Optional metadata for help/usage/version output.
     // If set_program_name() is not called, argv[0] basename is used.
+    // If set_usage() is not called, the usage line is auto-generated from the config.
     void set_version(const char* version);
     void set_program_name(const char* name);
+    void set_usage(const char* usage);
 };
 
 class CLIFlags {
