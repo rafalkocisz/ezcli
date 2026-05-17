@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 #include "ez_cli.h"
+#include <cassert>
 
 // ---------------------------------------------------------------------------
 // cli_parse — 4.1: output clearing + no-arguments case
@@ -41,6 +42,135 @@ TEST_SUITE("cli_parse — 4.1 output clearing and no-args")
         std::string    msg;
         CHECK(ez::cli_parse(1, argv, config, &flags, &options, &args, &msg) == EZ_CLI_OK);
         CHECK(msg.empty());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// cli_parse — 4.2: short flags + clustering
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("cli_parse — 4.2 short flags")
+{
+    TEST_CASE("single flag — is_set by short name")
+    {
+        ez::CLIConfig config;
+        int r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-v"};
+        ez::CLIFlags flags;
+        CHECK(ez::cli_parse(2, argv, config, &flags) == EZ_CLI_OK);
+        CHECK(flags.is_set("v"));
+    }
+
+    TEST_CASE("single flag — is_set by long name")
+    {
+        ez::CLIConfig config;
+        int r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-v"};
+        ez::CLIFlags flags;
+        CHECK(ez::cli_parse(2, argv, config, &flags) == EZ_CLI_OK);
+        CHECK(flags.is_set("verbose"));
+    }
+
+    TEST_CASE("short-name-only flag")
+    {
+        ez::CLIConfig config;
+        int r = config.add_flag(nullptr, 'x', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-x"};
+        ez::CLIFlags flags;
+        CHECK(ez::cli_parse(2, argv, config, &flags) == EZ_CLI_OK);
+        CHECK(flags.is_set("x"));
+    }
+
+    TEST_CASE("multiple separate flags")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_flag("quiet",   'q', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-v", "-q"};
+        ez::CLIFlags flags;
+        CHECK(ez::cli_parse(3, argv, config, &flags) == EZ_CLI_OK);
+        CHECK(flags.is_set("v"));
+        CHECK(flags.is_set("q"));
+    }
+
+    TEST_CASE("clustered flags")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_flag("quiet",   'q', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_flag("dry-run", 'd', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-vqd"};
+        ez::CLIFlags flags;
+        CHECK(ez::cli_parse(2, argv, config, &flags) == EZ_CLI_OK);
+        CHECK(flags.is_set("v"));
+        CHECK(flags.is_set("q"));
+        CHECK(flags.is_set("d"));
+    }
+
+    TEST_CASE("unset flag returns false")
+    {
+        ez::CLIConfig config;
+        int r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog"};
+        ez::CLIFlags flags;
+        CHECK(ez::cli_parse(1, argv, config, &flags) == EZ_CLI_OK);
+        CHECK(!flags.is_set("v"));
+        CHECK(!flags.is_set("verbose"));
+    }
+
+    TEST_CASE("duplicate flag in argv — no error")
+    {
+        ez::CLIConfig config;
+        int r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-v", "-v"};
+        ez::CLIFlags flags;
+        CHECK(ez::cli_parse(3, argv, config, &flags) == EZ_CLI_OK);
+        CHECK(flags.is_set("v"));
+    }
+
+    TEST_CASE("flags cleared between calls")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_flag("quiet",   'q', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv1[] = {"prog", "-v"};
+        ez::CLIFlags flags;
+        CHECK(ez::cli_parse(2, argv1, config, &flags) == EZ_CLI_OK);
+        CHECK(flags.is_set("v"));
+        const char* argv2[] = {"prog", "-q"};
+        CHECK(ez::cli_parse(2, argv2, config, &flags) == EZ_CLI_OK);
+        CHECK(!flags.is_set("v"));
+        CHECK(flags.is_set("q"));
+    }
+
+    TEST_CASE("null flags pointer — no crash")
+    {
+        ez::CLIConfig config;
+        int r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-v"};
+        CHECK(ez::cli_parse(2, argv, config, nullptr) == EZ_CLI_OK);
+    }
+
+    TEST_CASE("unknown short flag — NO_MATCH with message")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog", "-x"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_NO_MATCH);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("unknown flag in cluster — NO_MATCH")
+    {
+        ez::CLIConfig config;
+        int r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "-vx"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_NO_MATCH);
+        CHECK(!msg.empty());
     }
 }
 

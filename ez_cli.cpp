@@ -194,7 +194,7 @@ std::vector<std::string_view> CLIArgs::get_list(const char* name) const
 // cli_parse
 
 int cli_parse(int argc, const char* const* argv,
-              const CLIConfig& /*config*/,
+              const CLIConfig& config,
               CLIFlags*    flags,
               CLIOptions*  options,
               CLIArgs*     args,
@@ -213,7 +213,34 @@ int cli_parse(int argc, const char* const* argv,
     int i = 1;  // skip argv[0] (program name)
 
     while (i < argc) {
-        // parsing logic — phases 4.2–4.7
+        const char* token = argv[i];
+
+        if (token[0] == '-' && token[1] != '-' && token[1] != '\0') {
+            // Short flag / option cluster: -x, -xyz
+            for (const char* p = token + 1; *p != '\0'; ++p) {
+                char c = *p;
+
+                // Look up as a flag
+                bool found = false;
+                for (const auto& d : config.flags_) {
+                    if (d.short_name == c) {
+                        found = true;
+                        if (flags) flags->flags_.push_back({d.long_name, d.short_name});
+                        break;
+                    }
+                }
+                if (found) continue;
+
+                // Phase 4.3: option handling inserted here
+
+                if (message) { *message = "unknown option: -"; *message += c; }
+                return EZ_CLI_NO_MATCH;
+            }
+        }
+        // Phase 4.4/4.5: long options (--)
+        // Phase 4.6: positionals
+        // Phase 4.7: meta-options
+
         ++i;
     }
 
