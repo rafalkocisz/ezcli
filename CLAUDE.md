@@ -129,9 +129,10 @@ handle them by presenting `message` to the user.
 
 ## Coding Standards
 See [EZ.md § Code Style](ez/EZ.md#code-style--orthodox-c). Domain-specific additions:
-- `std::vector<std::string_view>` is used for variadic positional argument storage —
+- `std::vector` is used throughout for config definitions and parse results —
   acceptable per EZ.md since CLI parsing is a one-time startup operation.
-- `std::string` is used for the error/message output parameter only.
+- `std::string` is used for config metadata (version, program name, usage, descriptions,
+  long option names) and the error/message output parameter.
 
 ## Naming Conventions
 See [EZ.md § Naming Conventions](ez/EZ.md#naming-conventions) for the full table and

@@ -18,8 +18,8 @@ Part of the **ez** library family — shared design principles and conventions i
 - `--help`, `--usage`, `--version` built-in — pre-formatted strings returned to caller
 - Specific error codes — distinguish config errors from user input errors
 - Never prints — all output returned as strings or codes; caller decides what to display
-- No heap allocation in the option definitions (fixed-size arrays); `std::vector` used
-  only for variadic positional results
+- `std::vector` used for config storage and parse results — startup-only allocation,
+  not performance-sensitive
 
 **Not supported:** subcommands, optional option arguments, prefix/abbreviation matching,
 `--man`, Unicode.

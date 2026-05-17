@@ -280,7 +280,8 @@ int cli_parse(int argc, const char* const* argv,
 
     // Lambda to assign one positional token to the next available slot.
     // Captures pos_idx by reference so it advances as slots are filled.
-    size_t pos_idx = 0;
+    size_t pos_idx       = 0;
+    bool   in_positionals = false;  // set on first non-option token; see Parsing Semantics
     auto add_positional_token = [&](const char* val) -> int {
         if (pos_idx < config.positionals_.size()) {
             const auto& p = config.positionals_[pos_idx];
@@ -305,7 +306,7 @@ int cli_parse(int argc, const char* const* argv,
     while (i < argc) {
         const char* token = argv[i];
 
-        if (token[0] == '-' && token[1] != '-' && token[1] != '\0') {
+        if (!in_positionals && token[0] == '-' && token[1] != '-' && token[1] != '\0') {
             // Short flag / option cluster: -x, -xyz
             for (const char* p = token + 1; *p != '\0'; ++p) {
                 char c = *p;
@@ -344,7 +345,7 @@ int cli_parse(int argc, const char* const* argv,
                 return EZ_CLI_NO_MATCH;
             }
         }
-        else if (token[0] == '-' && token[1] == '-' && token[2] != '\0') {
+        else if (!in_positionals && token[0] == '-' && token[1] == '-' && token[2] != '\0') {
             // Meta-options take priority over all other long options
             if (std::strcmp(token, "--help") == 0) {
                 if (message) *message = make_help();
@@ -431,7 +432,8 @@ int cli_parse(int argc, const char* const* argv,
             break;
         }
         else {
-            // Positional token (no leading '-', or lone '-')
+            // Positional token — also reached when in_positionals is true (any token)
+            in_positionals = true;
             int r = add_positional_token(token);
             if (r != EZ_CLI_OK) return r;
         }

@@ -1092,6 +1092,35 @@ TEST_SUITE("cli_parse — 4.6 positionals and -- separator")
         CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr) == EZ_CLI_OK);
     }
 
+    TEST_CASE("flag after first positional is treated as positional, not a flag")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr);  assert(r == EZ_CLI_OK);
+        r = config.add_positional("input", nullptr);   assert(r == EZ_CLI_OK);
+        // 'file.txt' ends option parsing; '-v' is the second positional but has no slot
+        const char* argv[] = {"prog", "file.txt", "-v"};
+        std::string msg;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_NO_MATCH);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("'--' after a positional still routes remaining tokens to positionals")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_positional("first", nullptr);     assert(r == EZ_CLI_OK);
+        r = config.add_positional_list("rest", nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "a.txt", "--", "b.txt", "-v"};
+        ez::CLIArgs args;
+        CHECK(ez::cli_parse(5, argv, config, nullptr, nullptr, &args) == EZ_CLI_OK);
+        CHECK(args.get("first") == "a.txt");
+        auto list = args.get_list("rest");
+        CHECK(list.size() == 2);
+        CHECK(list[0] == "b.txt");
+        CHECK(list[1] == "-v");
+    }
+
     TEST_CASE("get on undeclared name returns empty")
     {
         ez::CLIConfig config;
