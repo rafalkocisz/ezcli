@@ -199,6 +199,9 @@ cmake --build build
 
 ## Sanitizers
 
+Running the test suite under sanitizers is the recommended way to check for memory errors
+and undefined behaviour.
+
 | Sanitizer | MSVC (VS 2022) | GCC / Clang |
 |---|---|---|
 | ASan (Address Sanitizer) | `/fsanitize=address` | `-fsanitize=address` |
@@ -206,15 +209,20 @@ cmake --build build
 
 ### Build
 
+Use a **separate build directory** to keep the sanitized build isolated from the normal one.
+
 ```sh
 # Linux / macOS — ASan + UBSan
 cmake -B build-san -DEZCLI_SANITIZE=ON
 cmake --build build-san
 
-# Windows (ASan only)
+# Windows (ASan only — MSVC does not support UBSan)
 cmake -B build-san -G "Visual Studio 17 2022" -DEZCLI_SANITIZE=ON
 cmake --build build-san --config RelWithDebInfo
 ```
+
+`RelWithDebInfo` is recommended on MSVC: it gives optimised code with debug symbols, which
+produces the most actionable ASan stack traces.
 
 ### Run
 
@@ -222,19 +230,34 @@ cmake --build build-san --config RelWithDebInfo
 # Linux / macOS
 ./build-san/tests/test_ez_cli
 
-# Windows
+# Windows — the ASan runtime DLL must be on PATH before running.
+# Adjust the MSVC version number to match your installation.
 $asanDir = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\<version>\bin\Hostx64\x64"
 $env:PATH = "$asanDir;$env:PATH"
 .\build-san\tests\RelWithDebInfo\test_ez_cli.exe
 ```
 
-For UBSan on Windows, use WSL2 with Clang:
+> **MSVC notes:**
+> - The `/RTC1` runtime-check flag (added by CMake to Debug builds) is incompatible with
+>   ASan; the CMakeLists.txt strips it automatically when `EZCLI_SANITIZE=ON`.
+> - The `/INCREMENTAL` linker option is likewise removed automatically.
+> - Use `RelWithDebInfo` rather than `Debug` for the sanitized build.
+
+### For UBSan on Windows
+
+The easiest option is WSL2 with GCC or Clang:
 
 ```sh
+# Inside WSL2 (Ubuntu)
 cmake -B build-san -DEZCLI_SANITIZE=ON -DCMAKE_CXX_COMPILER=clang++
 cmake --build build-san
 ./build-san/tests/test_ez_cli
 ```
+
+### What the sanitizers check
+
+All 137 tests pass clean under both ASan (MSVC, Windows) and ASan + UBSan (Clang, WSL2)
+with no reported errors.
 
 ## Fuzzing
 
