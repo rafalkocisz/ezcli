@@ -255,20 +255,65 @@ int cli_parse(int argc, const char* const* argv,
             }
         }
         else if (token[0] == '-' && token[1] == '-' && token[2] != '\0') {
-            // Long flag: --name
-            const char* name = token + 2;
-            bool found = false;
-            for (const auto& d : config.flags_) {
-                if (!d.long_name.empty() && d.long_name == name) {
-                    found = true;
-                    if (flags) flags->flags_.push_back({d.long_name, d.short_name});
-                    break;
+            // Long flag or long value option: --name  or  --name=value
+            const char* name_start = token + 2;
+            const char* eq = std::strchr(name_start, '=');
+
+            if (eq) {
+                // --name=value  or  --name= (empty value is an error)
+                std::string_view name(name_start, static_cast<size_t>(eq - name_start));
+                const char* value_str = eq + 1;
+
+                if (*value_str == '\0') {
+                    if (message) { *message = "option requires a value: --"; message->append(name.data(), name.size()); }
+                    return EZ_CLI_ERR_EMPTY_VAL;
                 }
-            }
-            if (!found) {
-                // Phase 4.5 will extend this branch for long value options
-                if (message) { *message = "unknown option: --"; *message += name; }
-                return EZ_CLI_NO_MATCH;
+
+                bool found = false;
+                for (const auto& d : config.options_) {
+                    if (!d.long_name.empty() && d.long_name == name) {
+                        found = true;
+                        if (options) options->options_.push_back({d.long_name, d.short_name, std::string_view(value_str)});
+                        break;
+                    }
+                }
+                if (!found) {
+                    if (message) { *message = "unknown option: --"; message->append(name.data(), name.size()); }
+                    return EZ_CLI_NO_MATCH;
+                }
+            } else {
+                // --name (no '=') — flag or space-separated value option
+                const char* name = name_start;
+                bool found = false;
+
+                for (const auto& d : config.flags_) {
+                    if (!d.long_name.empty() && d.long_name == name) {
+                        found = true;
+                        if (flags) flags->flags_.push_back({d.long_name, d.short_name});
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    for (const auto& d : config.options_) {
+                        if (!d.long_name.empty() && d.long_name == name) {
+                            found = true;
+                            if (i + 1 < argc) {
+                                std::string_view value = argv[++i];
+                                if (options) options->options_.push_back({d.long_name, d.short_name, value});
+                            } else {
+                                if (message) { *message = "option requires a value: --"; *message += name; }
+                                return EZ_CLI_ERR_MISSING_VAL;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                if (!found) {
+                    if (message) { *message = "unknown option: --"; *message += name; }
+                    return EZ_CLI_NO_MATCH;
+                }
             }
         }
         // Phase 4.6: positionals + '--' separator

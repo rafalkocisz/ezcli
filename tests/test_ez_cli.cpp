@@ -784,3 +784,142 @@ TEST_SUITE("cli_parse — 4.4 long flags")
         CHECK(ez::cli_parse(2, argv, config, nullptr) == EZ_CLI_OK);
     }
 }
+
+// ---------------------------------------------------------------------------
+// cli_parse — 4.5: long value options
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("cli_parse — 4.5 long value options")
+{
+    TEST_CASE("space form: --output file — is_set and get by long name")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--output", "file.txt"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.is_set("output"));
+        CHECK(options.get("output") == "file.txt");
+    }
+
+    TEST_CASE("space form — is_set and get by short name")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--output", "file.txt"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.is_set("o"));
+        CHECK(options.get("o") == "file.txt");
+    }
+
+    TEST_CASE("equals form: --output=file")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--output=file.txt"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.is_set("output"));
+        CHECK(options.get("output") == "file.txt");
+    }
+
+    TEST_CASE("long-name-only option, space form")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", '\0', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--output", "file.txt"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(3, argv, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.is_set("output"));
+        CHECK(options.get("output") == "file.txt");
+    }
+
+    TEST_CASE("long-name-only option, equals form")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", '\0', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--output=file.txt"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.get("output") == "file.txt");
+    }
+
+    TEST_CASE("empty value after '=' — EMPTY_VAL with message")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--output="};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_ERR_EMPTY_VAL);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("missing value at end of argv — MISSING_VAL with message")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--output"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_ERR_MISSING_VAL);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("unknown long option with '=' — NO_MATCH")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog", "--unknown=val"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_NO_MATCH);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("flag with '=' — NO_MATCH (flags don't take values)")
+    {
+        ez::CLIConfig config;
+        int r = config.add_flag("verbose", 'v', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--verbose=true"};
+        std::string msg;
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_NO_MATCH);
+        CHECK(!msg.empty());
+    }
+
+    TEST_CASE("long flag and long option mixed")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_flag("verbose", 'v', nullptr);   assert(r == EZ_CLI_OK);
+        r = config.add_option("output", 'o', nullptr);  assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--verbose", "--output=out.txt"};
+        ez::CLIFlags   flags;
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(3, argv, config, &flags, &options) == EZ_CLI_OK);
+        CHECK(flags.is_set("verbose"));
+        CHECK(options.is_set("output"));
+        CHECK(options.get("output") == "out.txt");
+    }
+
+    TEST_CASE("options cleared between calls")
+    {
+        ez::CLIConfig config;
+        int r;
+        r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        r = config.add_option("input",  'i', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv1[] = {"prog", "--output=a.txt"};
+        ez::CLIOptions options;
+        CHECK(ez::cli_parse(2, argv1, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(options.is_set("output"));
+        const char* argv2[] = {"prog", "--input=b.txt"};
+        CHECK(ez::cli_parse(2, argv2, config, nullptr, &options) == EZ_CLI_OK);
+        CHECK(!options.is_set("output"));
+        CHECK(options.get("input") == "b.txt");
+    }
+
+    TEST_CASE("null options pointer — no crash")
+    {
+        ez::CLIConfig config;
+        int r = config.add_option("output", 'o', nullptr); assert(r == EZ_CLI_OK);
+        const char* argv[] = {"prog", "--output=file.txt"};
+        CHECK(ez::cli_parse(2, argv, config, nullptr, nullptr) == EZ_CLI_OK);
+    }
+}
