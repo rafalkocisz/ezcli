@@ -3,6 +3,48 @@
 #include "ez_cli.h"
 
 // ---------------------------------------------------------------------------
+// cli_parse — 4.1: output clearing + no-arguments case
+// ---------------------------------------------------------------------------
+
+TEST_SUITE("cli_parse — 4.1 output clearing and no-args")
+{
+    TEST_CASE("no arguments — returns OK")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog"};
+        CHECK(ez::cli_parse(1, argv, config) == EZ_CLI_OK);
+    }
+
+    TEST_CASE("all output pointers null — no crash")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog"};
+        CHECK(ez::cli_parse(1, argv, config, nullptr, nullptr, nullptr, nullptr) == EZ_CLI_OK);
+    }
+
+    TEST_CASE("message is cleared on entry")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog"};
+        std::string msg = "leftover";
+        CHECK(ez::cli_parse(1, argv, config, nullptr, nullptr, nullptr, &msg) == EZ_CLI_OK);
+        CHECK(msg.empty());
+    }
+
+    TEST_CASE("empty config with no args — returns OK")
+    {
+        ez::CLIConfig config;
+        const char* argv[] = {"prog"};
+        ez::CLIFlags   flags;
+        ez::CLIOptions options;
+        ez::CLIArgs    args;
+        std::string    msg;
+        CHECK(ez::cli_parse(1, argv, config, &flags, &options, &args, &msg) == EZ_CLI_OK);
+        CHECK(msg.empty());
+    }
+}
+
+// ---------------------------------------------------------------------------
 // CLIConfig::add_flag
 // ---------------------------------------------------------------------------
 

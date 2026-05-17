@@ -176,15 +176,16 @@ std::vector<std::string_view> CLIArgs::get_list(const char* name) const
 }
 
 // ---------------------------------------------------------------------------
-// cli_parse (stub — Phase 4)
+// cli_parse
 
-int cli_parse(int /*argc*/, const char* const* /*argv*/,
+int cli_parse(int argc, const char* const* argv,
               const CLIConfig& /*config*/,
               CLIFlags*    flags,
               CLIOptions*  options,
               CLIArgs*     args,
               std::string* message)
 {
+    // Always clear on entry regardless of outcome
     if (flags)   flags->flags_.clear();
     if (options) options->options_.clear();
     if (args) {
@@ -193,6 +194,14 @@ int cli_parse(int /*argc*/, const char* const* /*argv*/,
         args->list_values_.clear();
     }
     if (message) message->clear();
+
+    int i = 1;  // skip argv[0] (program name)
+
+    while (i < argc) {
+        // parsing logic — phases 4.2–4.7
+        ++i;
+    }
+
     return EZ_CLI_OK;
 }
 
