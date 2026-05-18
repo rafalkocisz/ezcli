@@ -85,6 +85,10 @@ int add_flag(const char* long_name, char short_name, const char* description);
 int add_option(const char* long_name, char short_name, const char* description);
 int add_positional(const char* name, const char* description);
 int add_positional_list(const char* name, const char* description);
+
+void set_version(const char* version);       // shown by --version; omit to suppress
+void set_program_name(const char* name);     // overrides argv[0] basename in help output
+void set_usage(const char* usage);           // overrides auto-generated usage line
 ```
 
 Pass `nullptr` for `long_name` to define a short-only flag/option; pass `'\0'` for
@@ -281,7 +285,7 @@ cmake --build build-fuzz
 ### Run
 
 ```sh
-# Run for 500 000 iterations using the provided seed corpus.
+# Run for 500 000 iterations.
 ./build-fuzz/fuzz/fuzz_ez_cli fuzz/corpus/ -runs=500000
 
 # Run indefinitely, saving new interesting inputs to fuzz/corpus/.
@@ -333,15 +337,19 @@ sanitizer violations**.
 
 Tests use [doctest](https://github.com/doctest/doctest) (vendored single header; no download needed).
 
-```sh
-# Linux / macOS
-ctest --test-dir build
+### Linux / macOS
 
-# Windows
+```sh
+ctest --test-dir build
+```
+
+### Windows
+
+```bat
 ctest --test-dir build -C Debug
 ```
 
-For verbose output:
+For verbose output showing each test case:
 
 ```sh
 # Linux / macOS
@@ -433,5 +441,5 @@ ezcli/
   fuzz/
     CMakeLists.txt
     fuzz_ez_cli.cpp       libFuzzer target (Clang + WSL2/Linux only)
-    corpus/               seed inputs derived from the test suite
+    corpus/               starts empty; populated by the fuzzer
 ```
